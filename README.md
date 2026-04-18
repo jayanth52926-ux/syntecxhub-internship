@@ -1,0 +1,1 @@
+# syntecxhub-internship
