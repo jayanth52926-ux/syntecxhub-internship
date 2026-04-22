@@ -1,4 +1,6 @@
 My Project is based on Portscanner in cybersecurity.
+
+Scan the host/IP with the consent (Take the permission), its an illegal thing to do you will be risk your life.
   
 `port_scanner.py` is a **multi-threaded TCP port scanner CLI tool** with optional JSON reporting and logging.
 
