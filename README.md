@@ -1,61 +1,73 @@
-# syntecxhub-internship
+My Project is based on Portscanner in cybersecurity.
+  
+`port_scanner.py` is a **multi-threaded TCP port scanner CLI tool** with optional JSON reporting and logging.
 
-import socket
-import sys
-import threading
-from datetime import datetime
-import logging
+## What it does
 
-logging.basicConfig(filename='port_scan.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+- Takes a target host (DNS or IP), resolves it to IPv4.
+- Scans either:
+  - one port (`--port`), or
+  - a range (`--start` to `--end`).
+- Uses multiple threads (`--threads`) to speed up scanning.
+- Classifies each port as `OPEN`, `CLOSED`, `TIMEOUT`, or `ERROR`.
+- Prints live scan results, logs to `port_scan.log`, and can export a JSON summary (`--output`).
 
-def scan_port(host, port, open_ports):
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(1)
-        result = sock.connect_ex((host, port))
-        if result == 0:
-            print(f"[+] Port {port} is OPEN")
-            logging.info(f"OPEN: {host}:{port}")
-            open_ports.append(port)
-        else:
-            print(f"[-] Port {port} is CLOSED or TIMEOUT")
-        sock.close()
-    except socket.gaierror:
-        print(f"[!] Hostname {host} could not be resolved")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        print("\n[!] Scan interrupted by user")
-        sys.exit(1)
-    except Exception as e:
-        print(f"[!] Error on port {port}: {e}")
+## Main flow
 
-def scan_host(host, start_port, end_port):
-    print(f"\n[*] Scanning {host} from port {start_port} to {end_port}")
-    print(f"[*] Started at {datetime.now()}\n")
-    open_ports = []
-    threads = []
-    
-    for port in range(start_port, end_port + 1):
-        thread = threading.Thread(target=scan_port, args=(host, port, open_ports))
-        threads.append(thread)
-        thread.start()
-    
-    for thread in threads:
-        thread.join()
-    
-    print(f"\n[*] Scan completed at {datetime.now()}")
-    print(f"[*] Open ports found: {sorted(open_ports) if open_ports else 'None'}")
-    return open_ports
+1. `main()` parses CLI args.
+2. `resolve_host()` converts hostname to IPv4 using `socket.gethostbyname`.
+3. Determines single-port vs range scan.
+4. `validate_ports()` ensures range is valid (1–65535 and start <= end).
+5. `scan_host()` performs threaded scan and aggregates results.
+6. If `--output` is provided, `save_results_json()` writes a structured report.
+7. Handles:
+   - invalid input (`ValueError`)
+   - Ctrl+C (`KeyboardInterrupt`)
+   - unexpected exceptions
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python port_scanner.py <host> [start_port] [end_port]")
-        print("Example: python port_scanner.py scanme.nmap.org")
-        print("Example: python port_scanner.py 192.168.1.1 20 100")
-        sys.exit(1)
-    
-    host = sys.argv[1]
-    start_port = int(sys.argv[2]) if len(sys.argv) > 2 else 1
-    end_port = int(sys.argv[3]) if len(sys.argv) > 3 else 1024
-    
-    scan_host(host, start_port, end_port)
+## Key functions explained
+
+- `resolve_host(host)`  
+  Resolves DNS/IP to an IPv4 string; raises a friendly `ValueError` if resolution fails.
+
+- `check_port(host, port, timeout)`  
+  Creates a TCP socket and calls `connect_ex((host, port))`:
+  - `0` => `OPEN`
+  - nonzero => `CLOSED`
+  - socket timeout => `TIMEOUT`
+  - any other exception => `ERROR`
+
+- `worker(...)`  
+  Repeatedly pulls ports from a `Queue`, scans them, prints/logs each result, and safely appends to shared `results` using a `threading.Lock`.
+
+- `scan_host(...)`  
+  - Builds a queue of ports.
+  - Starts up to `min(max_threads, number_of_ports)` daemon worker threads.
+  - Joins all threads (waits for completion).
+  - Prints and logs final summary counts.
+  - Returns the `results` dictionary.
+
+- `save_results_json(...)`  
+  Writes target info, scan settings, full categorized port lists (sorted), and count summary to JSON.
+
+## CLI arguments
+
+- positional: `host`
+- optional:
+  - `--timeout` (default `1.0`)
+  - `--threads` (default `100`)
+  - `--port` (single port)
+  - `--start` (default `1`)
+  - `--end` (default `1024`)
+  - `--output` (JSON output file path)
+
+## Example usage
+
+- Scan default range:
+  - `python port_scanner.py scanme.nmap.org`
+- Scan one port:
+  - `python port_scanner.py localhost --port 22`
+- Scan custom range with tuning + JSON output:
+  - `python port_scanner.py 192.168.1.10 --start 20 --end 200 --threads 50 --timeout 0.5 --output results.json`
+
+If you want, I can also walk through one sample run and show how each argument changes behavior.
