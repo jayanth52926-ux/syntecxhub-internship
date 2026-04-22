@@ -68,6 +68,6 @@ My Project is based on Portscanner in cybersecurity.
 - Scan one port:
   - `python port_scanner.py localhost --port 22`
 - Scan custom range with tuning + JSON output:
-  - `python port_scanner.py 192.168.1.10 --start 20 --end 200 --threads 50 --timeout 0.5 --output results.json`
+  - `python port_scanner.py Local Host --start 20 --end 200 --threads 50 --timeout 0.5 --output results.json`
 
 If you want, I can also walk through one sample run and show how each argument changes behavior.
